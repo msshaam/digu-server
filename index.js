@@ -179,6 +179,7 @@ io.on('connection', (socket) => {
 
     const card = room.deck.pop();
     room.drawnCard = card;
+    room.drawnCardSource = 'deck';
     room.turnPhase = 'discard';
     cb({ success: true, card });
     emitRoomToAll(room);
@@ -194,6 +195,7 @@ io.on('connection', (socket) => {
 
     const card = room.discardPile.pop();
     room.drawnCard = card;
+    room.drawnCardSource = 'discard';
     room.turnPhase = 'discard';
     cb({ success: true, card });
     emitRoomToAll(room);
@@ -215,12 +217,18 @@ io.on('connection', (socket) => {
     const discardedCard = fullHand[discardIdx];
     const newHand = fullHand.filter((_, i) => i !== discardIdx);
 
+    // Block returning the same card that was taken from the discard pile
+    if (!isDiguDiscard && room.drawnCardSource === 'discard' && discardedCard.id === room.drawnCard.id) {
+      return cb({ success: false, error: 'You cannot discard the card you just took from the discard pile.' });
+    }
+
     if (isDiguDiscard) {
       if (!canDeclareDigu(newHand)) {
         return cb({ success: false, error: 'Your hand does not form valid melds (3-3-4).' });
       }
       player.hand = newHand;
       room.drawnCard = null;
+      room.drawnCardSource = null;
       room.status = 'roundEnd';
       room.winnerName = player.name;
 
@@ -244,6 +252,7 @@ io.on('connection', (socket) => {
 
     player.hand = newHand;
     room.drawnCard = null;
+    room.drawnCardSource = null;
     room.discardPile.push(discardedCard);
     room.turnPhase = 'draw';
     const n = room.players.length;
